@@ -1,8 +1,14 @@
+#!/bin/bash
 for socket in $(ls /var/run/php5-fpm-*.socket); do
+
+	# create the socket "description"
 	ps_socket=$(echo $socket | sed -e 'sX/X Xg' | awk '{print $3}' | sed -e 's/php5-fpm-//g' -e 's/.socket//g')
+
+	# check if socket is already running, to prevent spawning php-fpm if not necessary
 	ps=$(ps aux | grep "${ps_socket}" | grep -v grep | wc -l)
 	if [ $ps -gt 0 ]; then
-		# fetch status as json via cgi
+
+		# fetch status as json via direct cgi call
 		status=$(\
 			SCRIPT_NAME=/php-status \
 			SCRIPT_FILENAME=/php-status \
@@ -19,6 +25,7 @@ for socket in $(ls /var/run/php5-fpm-*.socket); do
 		| sed -e 's/"//g' -e 's/ /_/g' \
 		)
 
+		# assign values
 		Pool=$(echo "$json_readable" | grep "^pool:")
 		Pool=${Pool//pool:}
 		Uptime=$(echo "$json_readable" | grep "^start_since:")
@@ -41,10 +48,12 @@ for socket in $(ls /var/run/php5-fpm-*.socket); do
 		ListenQueueLen=${ListenQueueLen//listen_queue_len:}
 		MaxListenQueue=$(echo "$json_readable" | grep "^max_listen_queue:")
 		MaxListenQueue=${MaxListenQueue//max_listen_queue:}
-	
+
+		# create output & perfdata	
 		Output="0 php_${Pool} Idle=${IdleProcesses};|Busy=${ActiveProcesses};|MaxProcesses=${MaxActiveProcesses};|MaxProcessesReach=${MaxChildrenReached};|Queue=${ListenQueue};|MaxQueueReach=${MaxListenQueue};|QueueLen=${ListenQueueLen} OK - Busy/Idle ${ActiveProcesses}/${IdleProcesses} (max: ${MaxActiveProcesses}, reached: ${MaxChildrenReached}), Queue ${ListenQueue} (len: ${ListenQueueLen})"
 		echo $Output
 	else
+		# if php-fpm is not running, return 0 for all values
                 Uptime="0"
                 AcceptedConn="0"
                 ActiveProcesses="0"
@@ -56,6 +65,7 @@ for socket in $(ls /var/run/php5-fpm-*.socket); do
                 ListenQueueLen="0"
                 MaxListenQueue="0"
 
+		# create output & perfdata
                 Output="0 php_${ps_socket} Idle=${IdleProcesses};|Busy=${ActiveProcesses};|MaxProcesses=${MaxActiveProcesses};|MaxProcessesReach=${MaxChildrenReached};|Queue=${ListenQueue};|MaxQueueReach=${MaxListenQueue};|QueueLen=${ListenQueueLen} OK - Busy/Idle ${ActiveProcesses}/${IdleProcesses} (max: ${MaxActiveProcesses}, reached: ${MaxChildrenReached}), Queue ${ListenQueue} (len: ${ListenQueueLen})"
                 echo $Output
 	fi
